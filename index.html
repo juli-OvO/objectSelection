@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Border Overlay Generator</title>
+    <style>
+      :root {
+        --bg: #3231513b;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --accent: #564ec4;
+        --border: #e5e7eb;
+        --shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+      }
+
+      header {
+        padding: 24px 24px 8px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(280px, 360px) 1fr;
+        gap: 20px;
+        padding: 20px 24px 32px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 0px;
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 16px;
+      }
+
+      .section-title {
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
+      label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .row {
+        display: grid;
+        gap: 10px;
+      }
+
+      .row.inline {
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+      }
+
+      select,
+      input[type="number"],
+      input[type="file"] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 0px;
+        font-size: 14px;
+        background: #fff;
+      }
+
+      input[type="file"] {
+        padding: 6px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 6px;
+        justify-content: start;
+        align-content: start;
+      }
+
+      .grid input[type="checkbox"] {
+        width: 24px;
+        height: 24px;
+        accent-color: var(--accent);
+      }
+
+      .buttons {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      button {
+        border: none;
+        border-radius: 0px;
+        padding: 10px 12px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 6px 16px rgba(60, 196, 185, 0.25);
+      }
+
+      button.secondary {
+        background: #f3f4f6;
+        color: var(--ink);
+      }
+
+      .message {
+        font-size: 13px;
+        color: #9f1239;
+        min-height: 18px;
+      }
+
+      .canvas-wrap {
+        display: grid;
+        gap: 12px;
+        align-content: start;
+      }
+
+      .canvas-row {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      canvas {
+        max-width: 100%;
+        border-radius: 0px;
+        border: 1px dashed var(--border);
+        background: repeating-linear-gradient(
+          45deg,
+          #f8fafc,
+          #f8fafc 10px,
+          #f1f5f9 10px,
+          #f1f5f9 20px
+        );
+      }
+
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        .buttons {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Border Overlay Generator</h1>
+      <p>Check tiles, load PNG border pieces, and export a stitched overlay.</p>
+    </header>
+    <main>
+      <section class="panel controls">
+        <div class="row inline">
+          <div>
+            <div class="section-title">Grid</div>
+            <label for="gridSize">Grid size (1–5)</label>
+            <select id="gridSize">
+              <option value="1">1 × 1</option>
+              <option value="2">2 × 2</option>
+              <option value="3" selected>3 × 3</option>
+              <option value="4">4 × 4</option>
+              <option value="5">5 × 5</option>
+            </select>
+          </div>
+          <div>
+            <div class="section-title">Tile</div>
+            <label for="tileSize">Tile size (px)</label>
+            <input id="tileSize" type="number" min="16" max="256" value="100" />
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">Fill Map</div>
+          <div id="checkboxGrid" class="grid"></div>
+        </div>
+
+        <div>
+          <div class="section-title">Outer Corners</div>
+          <div class="row">
+            <label>Using default `select.png` (auto-rotated for all corners)</label>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">Background</div>
+          <div class="row">
+            <label
+              >Background Image
+              <input type="file" id="bg_image" accept="image/png,image/jpeg"
+            /></label>
+            <label>Shown only in preview (not exported)</label>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="clearBtn" class="secondary">Clear</button>
+          <button id="generateBtn" class="primary">Generate PNG</button>
+        </div>
+        <div id="message" class="message"></div>
+      </section>
+
+      <section class="panel canvas-wrap">
+        <div class="section-title">Preview</div>
+        <div class="canvas-row">
+          <canvas id="borderCanvas"></canvas>
+          <canvas id="preview"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const gridSizeSelect = document.getElementById("gridSize");
+      const tileSizeInput = document.getElementById("tileSize");
+      const checkboxGrid = document.getElementById("checkboxGrid");
+      const borderCanvas = document.getElementById("borderCanvas");
+      const previewCanvas = document.getElementById("preview");
+      const messageEl = document.getElementById("message");
+      const clearBtn = document.getElementById("clearBtn");
+      const generateBtn = document.getElementById("generateBtn");
+      const bgInput = document.getElementById("bg_image");
+
+      const assetIds = ["corner_outer_tl"];
+
+      const assets = Object.fromEntries(
+        assetIds.map((id) => [id, { img: null, loaded: false }])
+      );
+      const background = { img: null, loaded: false };
+
+      let gridSize = Number(gridSizeSelect.value);
+      let tileSize = Number(tileSizeInput.value);
+      let grid = [];
+
+      function initGrid() {
+        gridSize = Number(gridSizeSelect.value);
+        grid = Array.from({ length: gridSize }, () =>
+          Array.from({ length: gridSize }, () => false)
+        );
+        checkboxGrid.style.gridTemplateColumns = `repeat(${gridSize}, 24px)`;
+        checkboxGrid.innerHTML = "";
+        grid.forEach((row, y) => {
+          row.forEach((_, x) => {
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.addEventListener("change", () => {
+              grid[y][x] = box.checked;
+              render();
+            });
+            checkboxGrid.appendChild(box);
+          });
+        });
+        render();
+      }
+
+      function setMessage(text, isError = true) {
+        messageEl.textContent = text;
+        messageEl.style.color = isError ? "#9f1239" : "#0f766e";
+      }
+
+      function loadAsset(id, file) {
+        if (!file) {
+          assets[id] = { img: null, loaded: false };
+          render();
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          assets[id] = { img, loaded: true };
+          render();
+        };
+        img.onerror = () => {
+          assets[id] = { img: null, loaded: false };
+          setMessage(`Failed to load ${id}.`, true);
+        };
+        img.src = URL.createObjectURL(file);
+      }
+
+      function loadAssetFromUrl(id, url) {
+        const img = new Image();
+        img.onload = () => {
+          assets[id] = { img, loaded: true };
+          render();
+        };
+        img.onerror = () => {
+          assets[id] = { img: null, loaded: false };
+        };
+        img.src = url;
+      }
+
+      // Corner asset is preloaded from select.png (no upload input).
+
+      bgInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+          background.img = null;
+          background.loaded = false;
+          render();
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          background.img = img;
+          background.loaded = true;
+          render();
+        };
+        img.onerror = () => {
+          background.img = null;
+          background.loaded = false;
+          setMessage("Failed to load background image.", true);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+
+      function filled(x, y) {
+        return grid[y] && grid[y][x];
+      }
+
+      function drawPiece(ctx, id, x, y, align, rotateDeg = 0) {
+        const asset = assets[id];
+        if (!asset || !asset.loaded) return;
+        const { img } = asset;
+        const scale = 0.3;
+        const sw = img.width * scale;
+        const sh = img.height * scale;
+        let dx = x;
+        let dy = y;
+        if (align === "right") dx = x + tileSize - sw;
+        if (align === "bottom") dy = y + tileSize - sh;
+        if (align === "bottom-right") {
+          dx = x + tileSize - sw;
+          dy = y + tileSize - sh;
+        }
+        if (!rotateDeg) {
+          ctx.drawImage(img, dx, dy, sw, sh);
+          return;
+        }
+        const rad = (rotateDeg * Math.PI) / 180;
+        ctx.save();
+        ctx.translate(dx + sw / 2, dy + sh / 2);
+        ctx.rotate(rad);
+        ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+        ctx.restore();
+      }
+
+      function render() {
+        tileSize = Number(tileSizeInput.value);
+        const size = gridSize * tileSize;
+        borderCanvas.width = size;
+        borderCanvas.height = size;
+        previewCanvas.width = size;
+        previewCanvas.height = size;
+
+        const borderCtx = borderCanvas.getContext("2d");
+        borderCtx.clearRect(0, 0, size, size);
+
+        for (let y = 0; y < gridSize; y += 1) {
+          for (let x = 0; x < gridSize; x += 1) {
+            if (!filled(x, y)) continue;
+            const north = filled(x, y - 1);
+            const south = filled(x, y + 1);
+            const west = filled(x - 1, y);
+            const east = filled(x + 1, y);
+
+            const baseX = x * tileSize;
+            const baseY = y * tileSize;
+
+            if (!north && !west)
+              drawPiece(borderCtx, "corner_outer_tl", baseX, baseY);
+            if (!north && !east)
+              drawPiece(borderCtx, "corner_outer_tl", baseX, baseY, "right", 90);
+            if (!south && !west)
+              drawPiece(borderCtx, "corner_outer_tl", baseX, baseY, "bottom", -90);
+            if (!south && !east)
+              drawPiece(
+                borderCtx,
+                "corner_outer_tl",
+                baseX,
+                baseY,
+                "bottom-right",
+                180
+              );
+          }
+        }
+
+        const previewCtx = previewCanvas.getContext("2d");
+        previewCtx.clearRect(0, 0, size, size);
+        if (background.loaded) {
+          const { img } = background;
+          previewCtx.drawImage(img, 0, 0, size, size);
+        }
+        previewCtx.drawImage(borderCanvas, 0, 0);
+      }
+
+      function ensureAssets() {
+        const missing = assetIds.filter((id) => !assets[id].loaded);
+        if (missing.length) {
+          setMessage(
+            `Missing assets: ${missing.join(", ")}. Load PNGs before exporting.`
+          );
+          return false;
+        }
+        setMessage("PNG ready! Download should start.", false);
+        return true;
+      }
+
+      function downloadPNG() {
+        if (!ensureAssets()) return;
+        borderCanvas.toBlob((blob) => {
+          if (!blob) return;
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "border-overlay.png";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }, "image/png");
+      }
+
+      gridSizeSelect.addEventListener("change", initGrid);
+      tileSizeInput.addEventListener("input", render);
+      clearBtn.addEventListener("click", () => {
+        grid = grid.map((row) => row.map(() => false));
+        Array.from(checkboxGrid.children).forEach((box) => {
+          box.checked = false;
+        });
+        render();
+      });
+      generateBtn.addEventListener("click", downloadPNG);
+
+      initGrid();
+      loadAssetFromUrl("corner_outer_tl", "select.png");
+    </script>
+  </body>
+</html>
