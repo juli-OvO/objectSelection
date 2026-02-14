@@ -233,6 +233,21 @@
           </div>
         </div>
 
+        <div>
+          <div class="section-title">Border Color Filter</div>
+          <div class="row">
+            <label for="colorFilter">Tint</label>
+            <select id="colorFilter">
+              <option value="none" selected>None</option>
+              <option value="red">Red</option>
+              <option value="yellow">Yellow</option>
+              <option value="blue">Blue</option>
+              <option value="green">Green</option>
+              <option value="pink">Pink</option>
+            </select>
+          </div>
+        </div>
+
         <div class="buttons">
           <button id="clearBtn" class="secondary">Clear</button>
           <button id="generateBtn" class="primary">Generate PNG</button>
@@ -259,6 +274,7 @@
       const clearBtn = document.getElementById("clearBtn");
       const generateBtn = document.getElementById("generateBtn");
       const bgInput = document.getElementById("bg_image");
+      const colorFilterSelect = document.getElementById("colorFilter");
 
       const assetIds = ["corner_outer_tl"];
 
@@ -355,6 +371,117 @@
         return grid[y] && grid[y][x];
       }
 
+      function getSelectionBounds() {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -1;
+        let maxY = -1;
+
+        for (let y = 0; y < gridSize; y += 1) {
+          for (let x = 0; x < gridSize; x += 1) {
+            if (!filled(x, y)) continue;
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+
+        if (maxX < 0 || maxY < 0) return null;
+
+        return {
+          minX,
+          minY,
+          width: (maxX - minX + 1) * tileSize,
+          height: (maxY - minY + 1) * tileSize,
+        };
+      }
+
+      function applyColorFilter(ctx, width, height) {
+        const hueMap = {
+          red: 0,
+          yellow: 60,
+          green: 120,
+          blue: 220,
+          pink: 320,
+        };
+        const targetHue = hueMap[colorFilterSelect.value];
+        if (targetHue === undefined) return;
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const { data } = imageData;
+
+        function rgbToHsv(r, g, b) {
+          const rn = r / 255;
+          const gn = g / 255;
+          const bn = b / 255;
+          const max = Math.max(rn, gn, bn);
+          const min = Math.min(rn, gn, bn);
+          const delta = max - min;
+
+          let h = 0;
+          if (delta !== 0) {
+            if (max === rn) h = 60 * (((gn - bn) / delta) % 6);
+            else if (max === gn) h = 60 * ((bn - rn) / delta + 2);
+            else h = 60 * ((rn - gn) / delta + 4);
+          }
+          if (h < 0) h += 360;
+
+          const s = max === 0 ? 0 : delta / max;
+          const v = max;
+          return { s, v };
+        }
+
+        function hsvToRgb(h, s, v) {
+          const c = v * s;
+          const hh = h / 60;
+          const x = c * (1 - Math.abs((hh % 2) - 1));
+          let r1 = 0;
+          let g1 = 0;
+          let b1 = 0;
+
+          if (hh >= 0 && hh < 1) {
+            r1 = c;
+            g1 = x;
+          } else if (hh >= 1 && hh < 2) {
+            r1 = x;
+            g1 = c;
+          } else if (hh >= 2 && hh < 3) {
+            g1 = c;
+            b1 = x;
+          } else if (hh >= 3 && hh < 4) {
+            g1 = x;
+            b1 = c;
+          } else if (hh >= 4 && hh < 5) {
+            r1 = x;
+            b1 = c;
+          } else {
+            r1 = c;
+            b1 = x;
+          }
+
+          const m = v - c;
+          return {
+            r: Math.round((r1 + m) * 255),
+            g: Math.round((g1 + m) * 255),
+            b: Math.round((b1 + m) * 255),
+          };
+        }
+
+        for (let i = 0; i < data.length; i += 4) {
+          const alpha = data[i + 3];
+          if (alpha === 0) continue;
+
+          const { s, v } = rgbToHsv(data[i], data[i + 1], data[i + 2]);
+          const { r, g, b } = hsvToRgb(targetHue, s, v);
+          data[i] = r;
+          data[i + 1] = g;
+          data[i + 2] = b;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+      }
+
       function drawPiece(ctx, id, x, y, align, rotateDeg = 0) {
         const asset = assets[id];
         if (!asset || !asset.loaded) return;
@@ -422,6 +549,8 @@
           }
         }
 
+        applyColorFilter(borderCtx, size, size);
+
         const previewCtx = previewCanvas.getContext("2d");
         previewCtx.clearRect(0, 0, size, size);
         if (background.loaded) {
@@ -439,24 +568,51 @@
           );
           return false;
         }
-        setMessage("PNG ready! Download should start.", false);
         return true;
       }
 
       function downloadPNG() {
         if (!ensureAssets()) return;
-        borderCanvas.toBlob((blob) => {
+        const bounds = getSelectionBounds();
+        if (!bounds) {
+          setMessage("Select at least one tile before exporting.");
+          return;
+        }
+
+        const exportCanvas = document.createElement("canvas");
+        exportCanvas.width = bounds.width;
+        exportCanvas.height = bounds.height;
+        const exportCtx = exportCanvas.getContext("2d");
+        exportCtx.clearRect(0, 0, bounds.width, bounds.height);
+        exportCtx.drawImage(
+          borderCanvas,
+          bounds.minX * tileSize,
+          bounds.minY * tileSize,
+          bounds.width,
+          bounds.height,
+          0,
+          0,
+          bounds.width,
+          bounds.height
+        );
+
+        exportCanvas.toBlob((blob) => {
           if (!blob) return;
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
           link.download = "border-overlay.png";
           link.click();
           URL.revokeObjectURL(link.href);
+          setMessage(
+            `PNG exported at ${bounds.width}x${bounds.height}px.`,
+            false
+          );
         }, "image/png");
       }
 
       gridSizeSelect.addEventListener("change", initGrid);
       tileSizeInput.addEventListener("input", render);
+      colorFilterSelect.addEventListener("change", render);
       clearBtn.addEventListener("click", () => {
         grid = grid.map((row) => row.map(() => false));
         Array.from(checkboxGrid.children).forEach((box) => {
